@@ -1,0 +1,4 @@
+playwright==1.41.0
+pandas==2.1.4
+python-dotenv==1.0.0
+schedule==1.2.0

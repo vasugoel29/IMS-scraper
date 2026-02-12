@@ -99,7 +99,7 @@ Edit `room_scraper.py` to adjust:
 
 1. Create a `.env` file in the project root:
    ```env
-   IMS_USER_ID=2022UIT3042
+   IMS_USER_ID=your_id
    IMS_PASSWORD=your_password
    ```
 2. The scraper will automatically load these.

@@ -26,9 +26,14 @@ class RoomTimetableScraper:
         
     def generate_room_ranges(self):
         """
-        Targets rooms 5301 to 5310 specifically as requested
+        Targets the entire fifth block: 5000-5040, 5100-5140, 5200-5240, 5300-5320
         """
-        return [range(5301, 5311)]
+        return [
+            range(5000, 5030),
+            range(5100, 5130),
+            range(5200, 5231),
+            range(5300, 5321)
+        ]
         
     async def bypass_all_protections(self, page):
         """Bypass debugger and anti-scraping measures"""
@@ -574,14 +579,27 @@ class RoomTimetableScraper:
         
         if not discovered_rooms:
             print("⚠️  No rooms discovered dynamically. Falling back to configured ranges.")
-            # Fallback logic exists in original code, but let's just use what we have or empty
-            # If fallback is needed, we construct a list of strings
             rooms_to_scrape = []
             for r in self.room_ranges:
                 rooms_to_scrape.extend([str(x) for x in r])
         else:
-            print(f"✅ Found {len(discovered_rooms)} rooms to scrape.")
-            rooms_to_scrape = discovered_rooms
+            print(f"✅ Found {len(discovered_rooms)} rooms dynamically.")
+            # Filter rooms by our target ranges
+            rooms_to_scrape = []
+            target_range_set = set()
+            for r in self.room_ranges:
+                target_range_set.update(str(x) for x in r)
+            
+            for room in discovered_rooms:
+                room_txt = room['text'] if isinstance(room, dict) else str(room)
+                # Try to extract the number if it's like "G-108" or "5301"
+                match = re.search(r'(\d+)', room_txt)
+                if match:
+                    room_num_str = match.group(1)
+                    if room_num_str in target_range_set:
+                        rooms_to_scrape.append(room)
+            
+            print(f"🎯 Filtered to {len(rooms_to_scrape)} rooms in target ranges.")
 
         all_rooms_data = []
         total_rooms = len(rooms_to_scrape)

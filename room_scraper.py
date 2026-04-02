@@ -29,10 +29,18 @@ class RoomTimetableScraper:
         Targets the entire fifth block: 5000-5040, 5100-5140, 5200-5240, 5300-5320
         """
         return [
-            range(5000, 5030),
-            range(5100, 5130),
-            range(5200, 5231),
-            range(5300, 5321)
+            range(4000, 4040),
+            range(4100, 4140),
+            range(4200, 4240),
+            range(4300, 4340),
+            range(6000, 6040),
+            range(6100, 6140),
+            range(6200, 6240),
+            range(6300, 6340),
+            range(8000, 8040),
+            range(8100, 8140),
+            range(8200, 8240),     
+            [f"APJ-{i}" for i in range(1, 12)]
         ]
         
     async def bypass_all_protections(self, page):
@@ -82,7 +90,7 @@ class RoomTimetableScraper:
         # Try finding by value, fallback to text
         try:
             login_btn_selector = 'input[value="Student Login"]'
-            await page.wait_for_selector(login_btn_selector, state='visible', timeout=10000)
+            await page.wait_for_selector(login_btn_selector, state='visible', timeout=3000)
             await page.click(login_btn_selector)
         except:
             print("⚠️ Initial click failed. Trying alternative selector...")
@@ -97,7 +105,7 @@ class RoomTimetableScraper:
         print("🖼️  Waiting for login frame...")
         try:
             # Wait for the frame to be attached
-            element_handle = await page.wait_for_selector('frame[name="banner"]', timeout=10000)
+            element_handle = await page.wait_for_selector('frame[name="banner"]', timeout=3000)
             frame = await element_handle.content_frame()
             if not frame:
                 print("⚠️  Frame 'banner' found but content_frame is None. Trying to find by name directly.")
@@ -110,15 +118,15 @@ class RoomTimetableScraper:
             print("❌ Login frame 'banner' not found! Trying main page as fallback...")
             frame = page
             
-        # Fill inputs
         try:
-            await frame.fill('input[name="txtuserid"]', self.user_id, timeout=5000)
+            await frame.wait_for_selector('input[name="txtuserid"]', timeout=3000)
+            await frame.fill('input[name="txtuserid"]', self.user_id)
         except:
             print("⚠️  'txtuserid' not found, trying placeholder...")
             await frame.fill('input[placeholder="Enter userid"]', self.user_id)
             
         try:
-            await frame.fill('input[name="txtpassword"]', self.password, timeout=5000)
+            await frame.fill('input[name="txtpassword"]', self.password, timeout=3000)
         except:
             print("⚠️  'txtpassword' not found, trying placeholder...")
             await frame.fill('input[placeholder="Enter password"]', self.password)
@@ -137,10 +145,10 @@ class RoomTimetableScraper:
         
         print("🔐 Logging in...")
         try:
-            await frame.click('input[value="Login"]', timeout=5000)
+            await frame.click('input[value="Login"]', timeout=3000)
         except:
             print("⚠️ Login button not found by value, trying type...")
-            await frame.click('input[type="submit"]', timeout=5000)
+            await frame.click('input[type="submit"]', timeout=3000)
             
         await page.wait_for_load_state('networkidle', timeout=30000)
         await self.bypass_all_protections(page)
@@ -340,7 +348,7 @@ class RoomTimetableScraper:
         
         return True
 
-    async def scrape_room_timetable(self, page, room_identifier, semester: str = "ODD"):
+    async def scrape_room_timetable(self, page, room_identifier, semester: str = "EVEN"):
         """
         Scrape timetable for a specific room
         room_identifier: can be a simple string (room number) or a dict {value, text} from dropdown
@@ -433,7 +441,7 @@ class RoomTimetableScraper:
             data_found = False
             start_time = datetime.now()
             
-            for i in range(15): # Max 15 seconds
+            for i in range(5): # Max 5 seconds
                 await asyncio.sleep(1)
                 
                 # Check for table or "No data found"
@@ -461,8 +469,9 @@ class RoomTimetableScraper:
                 if table_check:
                     data_found = True
                     print(f"✓ Loaded ({i+1}s)")
-                    # Give it one extra second to be absolutely sure JS rendering is done
-                    await asyncio.sleep(1)
+                    # Give it 9 extra seconds to be absolutely sure JS rendering is done and data is correct
+                    # User requested 9 odd seconds because data of 5115 is being stored in 5116
+                    await asyncio.sleep(8)
                     break
                 
                 # Double check for "No data found" ONLY after a few seconds to avoid catching old state
@@ -566,7 +575,7 @@ class RoomTimetableScraper:
             print(f"⚠️  Error scraping room {room_text}: {e}")
             return None
 
-    async def scrape_all_rooms(self, page, semester: str = "ODD"):
+    async def scrape_all_rooms(self, page, semester: str = "EVEN"):
         """
         Iterate through all discovered rooms
         """
@@ -592,12 +601,13 @@ class RoomTimetableScraper:
             
             for room in discovered_rooms:
                 room_txt = room['text'] if isinstance(room, dict) else str(room)
-                # Try to extract the number if it's like "G-108" or "5301"
+                # Check if full text is in targets (handles "APJ-1")
+                # OR if extracted number is in targets (handles "G-108" -> "108")
                 match = re.search(r'(\d+)', room_txt)
-                if match:
-                    room_num_str = match.group(1)
-                    if room_num_str in target_range_set:
-                        rooms_to_scrape.append(room)
+                room_num_str = match.group(1) if match else None
+                
+                if room_txt in target_range_set or (room_num_str and room_num_str in target_range_set):
+                    rooms_to_scrape.append(room)
             
             print(f"🎯 Filtered to {len(rooms_to_scrape)} rooms in target ranges.")
 
@@ -627,7 +637,7 @@ class RoomTimetableScraper:
         
         return all_rooms_data
 
-    async def scrape_specific_rooms(self, page, room_numbers: list, semester: str = "ODD"):
+    async def scrape_specific_rooms(self, page, room_numbers: list, semester: str = "EVEN"):
         # ... logic is similar, just using the passed list directly ...
         # For simplicity, we assume room_numbers provided here are simple strings/ints
         # which scrape_room_timetable handles.
@@ -732,7 +742,7 @@ class RoomTimetableScraper:
         print(f"💾 Data saved to {output_path}")
         return output_path
     
-    async def run(self, mode='all', room_list=None, headless=False, semester="ODD"):
+    async def run(self, mode='all', room_list=None, headless=False, semester="EVEN"):
         """
         Main execution
         mode: 'all' to scrape all rooms, 'specific' to scrape room_list
@@ -820,12 +830,16 @@ async def main():
         fin_year="2025-26"
     )
     
-    # Option 1: Scrape ALL rooms (might take a while)
-    await scraper.run(mode='all', headless=False, semester="ODD")
+    # Target specific rooms as requested by the user
+    targeted_rooms = [
+        5027, 5028, 5025, 5024, 5018, 5015, 5013, 5014, 5017, 5012,
+        5101, 5115, 5116, 5119, 5127, 5129, 5133, 5138,
+        5201, 5215, 5216, 5217, 5218, 5219, 5220, 5221, 5222,
+        5311, 5312, 5310, 5309, 5308, 5305, 5306, 5307, 5301
+    ]
     
-    # Option 2: Scrape specific rooms only
-    # specific_rooms = [5306, 5307, 5308, 5309, 5310]
-    # await scraper.run(mode='specific', room_list=specific_rooms, headless=False, semester="ODD")
+    # Scrape all rooms in defined ranges
+    await scraper.run(mode='all', headless=False, semester="EVEN")
 
 
 if __name__ == "__main__":
